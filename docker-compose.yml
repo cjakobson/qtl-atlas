@@ -4,12 +4,6 @@ services:
     image: qtl-atlas:latest
     ports:
       - "8000:8000"
-    environment:
-      DATA_CSV_PATH: /data/science.adu3198_data_s4.csv
-    volumes:
-      # Mount the host directory that contains the CSV (read-only).
-      # Example: export DATA_DIR=$HOME/data && place the file there, or override the path:
-      - ${DATA_DIR:-./data}:/data:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]

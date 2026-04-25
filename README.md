@@ -19,7 +19,7 @@ Simple FastAPI web server for searching and exporting scientific paper results f
   - `source .venv/bin/activate`
 2. Install dependencies (includes tests):
   - `pip install -r requirements-dev.txt`
-3. Configure data path (optional if using the default absolute path):
+3. Configure data path (optional):
   - `cp .env.example .env`
   - `export DATA_CSV_PATH="/path/to/science.adu3198_data_s4.csv"`
 
@@ -35,8 +35,7 @@ Then open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Docker
 
-1. Place `science.adu3198_data_s4.csv` on the host (for example in `./data/`) and point compose at that folder:
-  - Create `./data` and copy the file as `data/science.adu3198_data_s4.csv`, or set `DATA_DIR` to a directory that contains the file.
+1. Ensure the CSV is present in the repo at `data/science.adu3198_data_s4.csv`.
 2. Build and run:
   - `docker compose up --build`
 3. Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
@@ -45,27 +44,8 @@ Then open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 **Build image only:** `docker build -t qtl-atlas .`
 
-**Run with custom CSV path in container:** set `DATA_CSV_PATH` and mount the file, for example:
-`docker run --rm -e DATA_CSV_PATH=/data/my.csv -v /path/on/host/file.csv:/data/my.csv:ro -p 8000:8000 qtl-atlas`
-
-### Render Disk seeding (optional)
-
-If your Render disk path (`DATA_CSV_PATH`) is empty at startup, you can seed it automatically:
-
-- `DATA_CSV_PATH=/var/data/science.adu3198_data_s4.csv`
-- `DATA_CSV_SOURCE_PATH=/opt/render/project/src/data/science.adu3198_data_s4.csv` (or any readable in-container source path)
-
-On first startup, if `DATA_CSV_PATH` is missing, the app will copy from the first existing source in this order:
-
-1. `DATA_CSV_SOURCE_PATH` (if set)
-2. `/opt/render/project/src/data/science.adu3198_data_s4.csv`
-3. `/opt/render/project/src/science.adu3198_data_s4.csv`
-4. `./data/science.adu3198_data_s4.csv`
-5. `./science.adu3198_data_s4.csv`
-
-So if you commit `data/science.adu3198_data_s4.csv` to the repo, Render can auto-seed the disk without extra env vars.
-
-The Docker image default is `DATA_CSV_PATH=/var/data/science.adu3198_data_s4.csv` for Render compatibility.
+**Run with custom CSV path in container (optional):**
+`docker run --rm -e DATA_CSV_PATH=/app/data/science.adu3198_data_s4.csv -p 8000:8000 qtl-atlas`
 
 ## Endpoints
 
