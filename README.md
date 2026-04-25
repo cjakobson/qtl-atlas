@@ -57,6 +57,8 @@ If your Render disk path (`DATA_CSV_PATH`) is empty at startup, you can seed it 
 
 On first startup, the app will copy `DATA_CSV_SOURCE_PATH` to `DATA_CSV_PATH` if the target file is missing.
 
+The Docker image default is `DATA_CSV_PATH=/var/data/science.adu3198_data_s4.csv` for Render compatibility.
+
 ## Endpoints
 
 - `GET /health` - liveness (for load balancers / Docker)

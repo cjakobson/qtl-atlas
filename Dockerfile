@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     HOME=/home/app \
-    DATA_CSV_PATH=/data/science.adu3198_data_s4.csv
+    DATA_CSV_PATH=/var/data/science.adu3198_data_s4.csv
 
 RUN groupadd --system app \
     && useradd --system --gid app --create-home --home-dir /home/app app
