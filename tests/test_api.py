@@ -52,6 +52,13 @@ def _sample_df() -> pd.DataFrame:
     )
 
 
+def test_health_ok():
+    client = TestClient(main.app)
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test_api_results_returns_filtered_rows(monkeypatch):
     monkeypatch.setattr(main, "load_dataframe", lambda: _sample_df())
     client = TestClient(main.app)

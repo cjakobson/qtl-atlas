@@ -543,6 +543,11 @@
         }
         return t || "row";
       });
+      var pointLabels = pts.map(function (p) {
+        if (p.commonName) return String(p.commonName);
+        if (p.protein) return String(p.protein);
+        return "";
+      });
       var markerColor = x.map(function (v) { return v >= 0 ? "#00a9e0" : "#f47c20"; });
       var customdata = pts.map(function (p) {
         return p.protein != null && p.protein !== "" ? String(p.protein) : "";
@@ -561,10 +566,12 @@
         gd,
         [{
           type: "scatter",
-          mode: "markers",
+          mode: "markers+text",
           x: x,
           y: y,
-          text: text,
+          text: pointLabels,
+          textposition: "top center",
+          textfont: { size: 9, color: "#d8e2f0" },
           customdata: customdata,
           marker: { size: 6, color: markerColor, opacity: 0.72, line: { width: 0 } },
           hovertemplate: "%{text}<br>β = %{x:.4f}<br>pVal = %{y:.3f}<br><i>Click → target search</i><extra></extra>"

@@ -17,8 +17,8 @@ Simple FastAPI web server for searching and exporting scientific paper results f
 1. Create and activate a virtual environment:
   - `python3 -m venv .venv`
   - `source .venv/bin/activate`
-2. Install dependencies:
-  - `pip install -r requirements.txt`
+2. Install dependencies (includes tests):
+  - `pip install -r requirements-dev.txt`
 3. Configure data path (optional if using the default absolute path):
   - `cp .env.example .env`
   - `export DATA_CSV_PATH="/path/to/science.adu3198_data_s4.csv"`
@@ -31,10 +31,26 @@ Then open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Test
 
-`pytest`
+`pytest` (install with `pip install -r requirements-dev.txt` if needed)
+
+## Docker
+
+1. Place `science.adu3198_data_s4.csv` on the host (for example in `./data/`) and point compose at that folder:
+   - Create `./data` and copy the file as `data/science.adu3198_data_s4.csv`, or set `DATA_DIR` to a directory that contains the file.
+2. Build and run:
+   - `docker compose up --build`
+3. Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+**Health check:** `GET /health` returns `{"status":"ok"}` (used by the compose `healthcheck`).
+
+**Build image only:** `docker build -t qtl-atlas .`
+
+**Run with custom CSV path in container:** set `DATA_CSV_PATH` and mount the file, for example:
+`docker run --rm -e DATA_CSV_PATH=/data/my.csv -v /path/on/host/file.csv:/data/my.csv:ro -p 8000:8000 qtl-atlas`
 
 ## Endpoints
 
+- `GET /health` - liveness (for load balancers / Docker)
 - `GET /` - HTML search UI
 - `GET /api/results` - JSON response using same query params
 - `GET /export.csv` - CSV download using same query params

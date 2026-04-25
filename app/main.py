@@ -25,6 +25,11 @@ from app.search import (
 app = FastAPI(title="Scientific Paper Search")
 templates = Jinja2Templates(directory="app/templates")
 
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
 def _sort_href(column_key: str, query: SearchQuery) -> str:
     """Build query string for sorting by `column_key` (toggle order if already active)."""
     if query.sort_by == column_key:
