@@ -48,6 +48,15 @@ Then open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 **Run with custom CSV path in container:** set `DATA_CSV_PATH` and mount the file, for example:
 `docker run --rm -e DATA_CSV_PATH=/data/my.csv -v /path/on/host/file.csv:/data/my.csv:ro -p 8000:8000 qtl-atlas`
 
+### Render Disk seeding (optional)
+
+If your Render disk path (`DATA_CSV_PATH`) is empty at startup, you can seed it automatically:
+
+- `DATA_CSV_PATH=/var/data/science.adu3198_data_s4.csv`
+- `DATA_CSV_SOURCE_PATH=/opt/render/project/src/data/science.adu3198_data_s4.csv` (or any readable in-container source path)
+
+On first startup, the app will copy `DATA_CSV_SOURCE_PATH` to `DATA_CSV_PATH` if the target file is missing.
+
 ## Endpoints
 
 - `GET /health` - liveness (for load balancers / Docker)
