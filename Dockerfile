@@ -5,9 +5,11 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
+    HOME=/home/app \
     DATA_CSV_PATH=/data/science.adu3198_data_s4.csv
 
-RUN groupadd --system app && useradd --system --gid app --no-create-home app
+RUN groupadd --system app \
+    && useradd --system --gid app --create-home --home-dir /home/app app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
