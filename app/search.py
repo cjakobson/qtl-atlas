@@ -9,15 +9,17 @@ import pandas as pd
 
 CATEGORICAL_FILTERS = ["chr", "variantType", "snpIndel", "isQtn", "isTx", "promoter"]
 NUMERIC_FILTERS = ["pVal", "beta", "varExp", "dist", "percentage"]
-SORTABLE_COLUMNS = ["pVal", "beta", "varExp", "dist", "percentage", "protein"]
+
+SEARCH_MODE_TARGETS = "targets"
+SEARCH_MODE_REGULATORS = "regulators"
+KEYWORD_COLUMNS_TARGETS = ("protein", "commonName")
+KEYWORD_COLUMNS_REGULATORS = ("gene1", "gene2", "common1", "common2")
 
 
 @dataclass
 class SearchQuery:
     q: str = ""
-    protein: str = ""
-    common_name: str = ""
-    gene: str = ""
+    search_mode: str = SEARCH_MODE_TARGETS
     chr_value: str = ""
     variant_type: str = ""
     snp_indel: str = ""
@@ -44,24 +46,25 @@ def _contains(series: pd.Series, term: str) -> pd.Series:
     return series.fillna("").astype(str).str.contains(term, case=False, na=False, regex=False)
 
 
-def _apply_keyword(df: pd.DataFrame, keyword: str) -> pd.DataFrame:
+def _keyword_columns_for_mode(mode: str) -> tuple[str, ...]:
+    if mode == SEARCH_MODE_REGULATORS:
+        return KEYWORD_COLUMNS_REGULATORS
+    return KEYWORD_COLUMNS_TARGETS
+
+
+def _apply_keyword(df: pd.DataFrame, keyword: str, mode: str) -> pd.DataFrame:
     if not keyword:
         return df
 
-    masks = [_contains(df[col], keyword) for col in df.columns]
-    if not masks:
+    columns = [c for c in _keyword_columns_for_mode(mode) if c in df.columns]
+    if not columns:
         return df
 
+    masks = [_contains(df[col], keyword) for col in columns]
     combined = masks[0]
     for mask in masks[1:]:
         combined = combined | mask
     return df[combined]
-
-
-def _apply_partial_match(df: pd.DataFrame, column: str, value: str) -> pd.DataFrame:
-    if not value or column not in df.columns:
-        return df
-    return df[_contains(df[column], value)]
 
 
 def _apply_exact_match(df: pd.DataFrame, column: str, value: str) -> pd.DataFrame:
@@ -83,17 +86,12 @@ def _apply_range(df: pd.DataFrame, column: str, min_value: Optional[float], max_
 
 
 def apply_filters(df: pd.DataFrame, query: SearchQuery) -> pd.DataFrame:
-    filtered = _apply_keyword(df, query.q.strip())
-    filtered = _apply_partial_match(filtered, "protein", query.protein.strip())
-    filtered = _apply_partial_match(filtered, "commonName", query.common_name.strip())
-
-    if query.gene.strip():
-        gene_term = query.gene.strip()
-        gene_mask = pd.Series(False, index=filtered.index)
-        for column in ["gene1", "gene2"]:
-            if column in filtered.columns:
-                gene_mask = gene_mask | _contains(filtered[column], gene_term)
-        filtered = filtered[gene_mask]
+    mode = (
+        SEARCH_MODE_REGULATORS
+        if query.search_mode == SEARCH_MODE_REGULATORS
+        else SEARCH_MODE_TARGETS
+    )
+    filtered = _apply_keyword(df, query.q.strip(), mode)
 
     filtered = _apply_exact_match(filtered, "chr", query.chr_value.strip())
     filtered = _apply_exact_match(filtered, "variantType", query.variant_type.strip())
@@ -112,7 +110,12 @@ def apply_filters(df: pd.DataFrame, query: SearchQuery) -> pd.DataFrame:
 
 
 def apply_sort(df: pd.DataFrame, sort_by: str, sort_order: str) -> pd.DataFrame:
-    column = sort_by if sort_by in SORTABLE_COLUMNS and sort_by in df.columns else "pVal"
+    if sort_by in df.columns:
+        column = sort_by
+    elif "pVal" in df.columns:
+        column = "pVal"
+    else:
+        column = df.columns[0]
     ascending = sort_order != "desc"
     return df.sort_values(by=column, ascending=ascending, na_position="last")
 

@@ -1,17 +1,124 @@
 from __future__ import annotations
 
 from io import StringIO
-from typing import Optional
+from typing import Any, Optional
+from urllib.parse import urlencode
+
+import numpy as np
+import pandas as pd
 
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from app.data import load_dataframe
-from app.search import SearchQuery, apply_filters, apply_sort, paginate, to_records
+from app.search import (
+    SEARCH_MODE_REGULATORS,
+    SEARCH_MODE_TARGETS,
+    SearchQuery,
+    apply_filters,
+    apply_sort,
+    paginate,
+    to_records,
+)
 
 app = FastAPI(title="Scientific Paper Search")
 templates = Jinja2Templates(directory="app/templates")
+
+def _sort_href(column_key: str, query: SearchQuery) -> str:
+    """Build query string for sorting by `column_key` (toggle order if already active)."""
+    if query.sort_by == column_key:
+        next_order = "asc" if query.sort_order == "desc" else "desc"
+    else:
+        next_order = "asc"
+    params = {
+        "q": query.q,
+        "search_mode": query.search_mode,
+        "sort_by": column_key,
+        "sort_order": next_order,
+        "page": "1",
+        "page_size": str(query.page_size),
+    }
+    return "?" + urlencode(params)
+
+
+REGULATOR_LINK_KEYS = frozenset({"gene1", "gene2", "common1", "common2"})
+TARGET_LINK_KEYS = frozenset({"protein", "commonName"})
+
+
+def _symbol_search_href(
+    term: str | int | float | None,
+    query: SearchQuery,
+    search_mode: str,
+) -> str:
+    """Query string for a keyword search in the given mode (targets or regulators)."""
+    if term is None:
+        return ""
+    t = str(term).strip()
+    if not t or t.lower() in ("nan", "none", "<na>"):
+        return ""
+    params = {
+        "q": t,
+        "search_mode": search_mode,
+        "page": "1",
+        "sort_by": query.sort_by,
+        "sort_order": query.sort_order,
+        "page_size": str(query.page_size),
+    }
+    return "?" + urlencode(params)
+
+
+def _regulator_href(term: str | int | float | None, query: SearchQuery) -> str:
+    """Regulators search from gene1/gene2/common1/common2 cell values."""
+    return _symbol_search_href(term, query, SEARCH_MODE_REGULATORS)
+
+
+def _target_href(term: str | int | float | None, query: SearchQuery) -> str:
+    """Targets search from protein / commonName cell values."""
+    return _symbol_search_href(term, query, SEARCH_MODE_TARGETS)
+
+
+VOLCANO_MAX_POINTS = 12_000
+
+
+def _build_volcano_points(df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Rows for regulators-mode volcano: beta (x), pVal (y), plus labels for hover."""
+    if df.empty or "beta" not in df.columns or "pVal" not in df.columns:
+        return []
+
+    cols = ["beta", "pVal"]
+    for optional in ("protein", "commonName", "gene1", "gene2"):
+        if optional in df.columns:
+            cols.append(optional)
+
+    plot_df = df.loc[:, cols].dropna(subset=["beta", "pVal"])
+    if plot_df.empty:
+        return []
+
+    if len(plot_df) > VOLCANO_MAX_POINTS:
+        plot_df = plot_df.sample(n=VOLCANO_MAX_POINTS, random_state=1)
+
+    clean = plot_df.replace([np.inf, -np.inf], np.nan).dropna(subset=["beta", "pVal"])
+    return to_records(clean)
+
+
+DISPLAY_COLUMNS = [
+    ("protein", "protein"),
+    ("commonName", "common name"),
+    ("pVal", "pVal"),
+    ("beta", "beta"),
+    ("varExp", "varExp"),
+    ("isQtn", "isQTN"),
+    ("index", "index"),
+    ("chr", "chr"),
+    ("pos", "pos"),
+    ("variantType", "variantType"),
+    ("gene1", "gene1"),
+    ("gene2", "gene2"),
+    ("encoded", "encoded"),
+    ("common1", "common1"),
+    ("common2", "common2"),
+]
 
 
 def _optional_float(value: Optional[str]) -> Optional[float]:
@@ -23,11 +130,16 @@ def _optional_float(value: Optional[str]) -> Optional[float]:
     return float(stripped)
 
 
+def _normalize_search_mode(value: str) -> str:
+    v = (value or "").strip().lower()
+    if v == SEARCH_MODE_REGULATORS:
+        return SEARCH_MODE_REGULATORS
+    return SEARCH_MODE_TARGETS
+
+
 def _search_query_from_request(
     q: str = "",
-    protein: str = "",
-    common_name: str = "",
-    gene: str = "",
+    search_mode: str = SEARCH_MODE_TARGETS,
     chr_value: str = Query(default="", alias="chr"),
     variant_type: str = "",
     snp_indel: str = "",
@@ -51,9 +163,7 @@ def _search_query_from_request(
 ) -> SearchQuery:
     return SearchQuery(
         q=q,
-        protein=protein,
-        common_name=common_name,
-        gene=gene,
+        search_mode=_normalize_search_mode(search_mode),
         chr_value=chr_value,
         variant_type=variant_type,
         snp_indel=snp_indel,
@@ -93,16 +203,26 @@ def _run_query(query: SearchQuery):
 @app.get("/")
 def index(request: Request, query: SearchQuery = Depends(_search_query_from_request)):
     result = _run_query(query)
-    columns = load_dataframe().columns.tolist()
+    available_columns = set(load_dataframe().columns.tolist())
+    display_columns = [{"key": key, "label": label} for key, label in DISPLAY_COLUMNS if key in available_columns]
+    volcano_points: list[dict[str, Any]] = []
+    if query.search_mode == SEARCH_MODE_REGULATORS:
+        volcano_points = _build_volcano_points(result["all_rows"])
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "query": query,
-            "columns": columns,
+            "display_columns": display_columns,
             "rows": to_records(result["rows"]),
             "total_hits": result["total_hits"],
             "total_pages": result["total_pages"],
+            "sort_href": lambda k: _sort_href(k, query),
+            "regulator_href": lambda t: _regulator_href(t, query),
+            "regulator_link_keys": REGULATOR_LINK_KEYS,
+            "target_href": lambda t: _target_href(t, query),
+            "target_link_keys": TARGET_LINK_KEYS,
+            "volcano_points": volcano_points,
         },
     )
 
