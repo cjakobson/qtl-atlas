@@ -55,7 +55,15 @@ If your Render disk path (`DATA_CSV_PATH`) is empty at startup, you can seed it 
 - `DATA_CSV_PATH=/var/data/science.adu3198_data_s4.csv`
 - `DATA_CSV_SOURCE_PATH=/opt/render/project/src/data/science.adu3198_data_s4.csv` (or any readable in-container source path)
 
-On first startup, the app will copy `DATA_CSV_SOURCE_PATH` to `DATA_CSV_PATH` if the target file is missing.
+On first startup, if `DATA_CSV_PATH` is missing, the app will copy from the first existing source in this order:
+
+1. `DATA_CSV_SOURCE_PATH` (if set)
+2. `/opt/render/project/src/data/science.adu3198_data_s4.csv`
+3. `/opt/render/project/src/science.adu3198_data_s4.csv`
+4. `./data/science.adu3198_data_s4.csv`
+5. `./science.adu3198_data_s4.csv`
+
+So if you commit `data/science.adu3198_data_s4.csv` to the repo, Render can auto-seed the disk without extra env vars.
 
 The Docker image default is `DATA_CSV_PATH=/var/data/science.adu3198_data_s4.csv` for Render compatibility.
 
