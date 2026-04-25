@@ -142,12 +142,18 @@
     }
     .meta strong { color: var(--text); }
 
+    .results-table-panel {
+      width: 100%;
+      max-width: 1240px;
+    }
+
     .table-wrap {
       border: 1px solid var(--line);
       border-radius: 12px;
       overflow: auto;
       max-height: 72vh;
       background: #616974;
+      width: 100%;
     }
     table {
       width: 100%;
@@ -355,6 +361,8 @@
       position: sticky;
       top: 12px;
       min-height: 200px;
+      width: 100%;
+      max-width: 420px;
     }
     .volcano-panel h3 {
       margin: 0 0 8px;
@@ -375,9 +383,10 @@
     }
     .volcano-plot-frame {
       position: relative;
-      width: min(100%, 65vh, 480px);
+      width: 100%;
       aspect-ratio: 1 / 1;
-      margin: 0 auto;
+      max-width: 420px;
+      margin: 0;
     }
     #volcano-plot {
       position: absolute;
@@ -404,6 +413,14 @@
       .volcano-panel {
         position: relative;
         top: auto;
+      }
+      .results-table-panel {
+        max-width: 100%;
+      }
+      .volcano-plot-frame {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
       }
     }
   </style>
