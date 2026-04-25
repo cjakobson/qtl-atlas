@@ -214,9 +214,9 @@ def index(request: Request, query: SearchQuery = Depends(_search_query_from_requ
     if query.search_mode == SEARCH_MODE_REGULATORS:
         volcano_points = _build_volcano_points(result["all_rows"])
     return templates.TemplateResponse(
+        request,
         "index.html",
         {
-            "request": request,
             "query": query,
             "display_columns": display_columns,
             "rows": to_records(result["rows"]),
