@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pQTL mapping</title>
+  <style>
+    :root {
+      --bg: #2f343a;
+      --panel: #3a4047;
+      --text: #ecf2fa;
+      --muted: #b7c1ce;
+      --line: #4c535c;
+      --accent: #6ea8ff;
+      --accent-dark: #4e8df4;
+      --shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 2rem;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+    .citation {
+      margin-top: 8px;
+      color: #4d627b;
+      font-size: 0.9rem;
+    }
+    .citation a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .citation a:hover { text-decoration: underline; }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      margin: 0 0 12px;
+      font-size: 0.95rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    form { display: grid; gap: 14px; }
+    .form-grid { display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: 10px; }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #d9e2ee;
+    }
+    input, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #2f343a;
+      color: #f5f8fc;
+      padding: 9px 10px;
+      font-size: 13px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #8db0ff;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    button, .button-link {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.05s, background-color 0.15s, border-color 0.15s;
+    }
+    button:active, .button-link:active { transform: translateY(1px); }
+    .button-primary { background: var(--accent); color: #fff; }
+    .button-primary:hover { background: var(--accent-dark); }
+    .button-secondary {
+      background: #3a4047;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .button-secondary:hover { background: #474f58; }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: #39506b;
+      color: #d2dbe8;
+      font-size: 0.92rem;
+      margin-bottom: 12px;
+    }
+    .meta strong { color: var(--text); }
+
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: auto;
+      max-height: 72vh;
+      background: #343a41;
+    }
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12px;
+      min-width: 1100px;
+    }
+    th, td {
+      border-bottom: 1px solid #e9eff7;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+    th {
+      background: #474f58;
+      color: #e6edf7;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    tbody tr:nth-child(odd) { background: #3a4047; }
+    tbody tr:hover { background: #4a535d; }
+    tbody tr.beta-positive { background: #0093cf; color: #f7fcff; }
+    tbody tr.beta-negative { background: #f47c20; color: #1f1a14; }
+    tbody tr.beta-positive td, tbody tr.beta-negative td { border-bottom-color: rgba(255, 255, 255, 0.2); }
+
+    .empty {
+      margin: 0;
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      background: #3a4047;
+    }
+
+    @media (max-width: 1200px) {
+      .form-grid { grid-template-columns: repeat(3, minmax(180px, 1fr)); }
+    }
+    @media (max-width: 900px) {
+      .container { padding: 14px; }
+      .form-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+      h1 { font-size: 1.6rem; }
+    }
+    @media (max-width: 620px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .meta { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="hero">
+      <h1>pQTL mapping</h1>
+      <p class="subtitle">Search, filter, sort, and export QTL records from the S4 dataset.</p>
+      <p class="citation">
+        Citation:
+        <a href="https://www.science.org/doi/10.1126/science.adu3198" target="_blank" rel="noopener noreferrer">
+          Authors et al., "Paper Title" (Science, DOI: 10.1126/science.adu3198)
+        </a>
+      </p>
+    </header>
+
+    <section class="card">
+      <h2 class="section-title">Filters</h2>
+      <form method="get" action="/" id="search-form">
+        <div class="form-grid">
+          <label>Keyword (all fields)
+            <input type="text" name="q" value="{{ query.q }}" placeholder="e.g. GND1, missense, chr 8">
+          </label>
+          <label>Protein
+            <input type="text" name="protein" value="{{ query.protein }}">
+          </label>
+          <label>Common Name
+            <input type="text" name="common_name" value="{{ query.common_name }}">
+          </label>
+          <label>Gene (gene1/gene2)
+            <input type="text" name="gene" value="{{ query.gene }}">
+          </label>
+
+          <label>Chromosome
+            <input type="text" name="chr" value="{{ query.chr_value }}">
+          </label>
+          <label>Variant Type
+            <input type="text" name="variant_type" value="{{ query.variant_type }}">
+          </label>
+          <label>SNP/Indel
+            <input type="text" name="snp_indel" value="{{ query.snp_indel }}">
+          </label>
+          <label>isQtn
+            <input type="text" name="is_qtn" value="{{ query.is_qtn }}">
+          </label>
+
+          <label>isTx
+            <input type="text" name="is_tx" value="{{ query.is_tx }}">
+          </label>
+          <label>Promoter
+            <input type="text" name="promoter" value="{{ query.promoter }}">
+          </label>
+          <label>pVal min
+            <input type="number" step="any" name="pval_min" value="{{ query.pval_min if query.pval_min is not none else '' }}">
+          </label>
+          <label>pVal max
+            <input type="number" step="any" name="pval_max" value="{{ query.pval_max if query.pval_max is not none else '' }}">
+          </label>
+
+          <label>beta min
+            <input type="number" step="any" name="beta_min" value="{{ query.beta_min if query.beta_min is not none else '' }}">
+          </label>
+          <label>beta max
+            <input type="number" step="any" name="beta_max" value="{{ query.beta_max if query.beta_max is not none else '' }}">
+          </label>
+          <label>varExp min
+            <input type="number" step="any" name="varexp_min" value="{{ query.varexp_min if query.varexp_min is not none else '' }}">
+          </label>
+          <label>varExp max
+            <input type="number" step="any" name="varexp_max" value="{{ query.varexp_max if query.varexp_max is not none else '' }}">
+          </label>
+
+          <label>dist min
+            <input type="number" step="any" name="dist_min" value="{{ query.dist_min if query.dist_min is not none else '' }}">
+          </label>
+          <label>dist max
+            <input type="number" step="any" name="dist_max" value="{{ query.dist_max if query.dist_max is not none else '' }}">
+          </label>
+          <label>percentage min
+            <input type="number" step="any" name="percentage_min" value="{{ query.percentage_min if query.percentage_min is not none else '' }}">
+          </label>
+          <label>percentage max
+            <input type="number" step="any" name="percentage_max" value="{{ query.percentage_max if query.percentage_max is not none else '' }}">
+          </label>
+
+          <label>Sort By
+            <select name="sort_by">
+              {% for c in ["pVal", "beta", "varExp", "dist", "percentage", "protein"] %}
+              <option value="{{ c }}" {% if query.sort_by == c %}selected{% endif %}>{{ c }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Sort Order
+            <select name="sort_order">
+              <option value="asc" {% if query.sort_order == "asc" %}selected{% endif %}>Ascending</option>
+              <option value="desc" {% if query.sort_order == "desc" %}selected{% endif %}>Descending</option>
+            </select>
+          </label>
+          <label>Page
+            <input type="number" min="1" name="page" value="{{ query.page }}">
+          </label>
+          <label>Page Size
+            <input type="number" min="1" max="200" name="page_size" value="{{ query.page_size }}">
+          </label>
+        </div>
+
+        <div class="actions">
+          <button class="button-primary" type="submit">Apply Search</button>
+          <button class="button-secondary" type="button" onclick="window.location='/'">Reset</button>
+          <button
+            class="button-secondary"
+            type="button"
+            onclick="window.location='/export.csv?' + new URLSearchParams(new FormData(document.getElementById('search-form'))).toString()"
+          >
+            Export CSV
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="meta">
+        <span><strong>{{ total_hits }}</strong> total matches</span>
+        <span>Page <strong>{{ query.page }}</strong> of <strong>{{ total_pages }}</strong></span>
+      </div>
+
+      {% if rows %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              {% for col in columns %}
+              <th>{{ col }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr class="{% if row['beta'] is number and row['beta'] > 0 %}beta-positive{% elif row['beta'] is number and row['beta'] < 0 %}beta-negative{% endif %}">
+              {% for col in columns %}
+              <td>{{ row[col] if row[col] is not none else "" }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty">No rows matched your current filters.</p>
+      {% endif %}
+    </section>
+  </div>
+</body>
+</html>
