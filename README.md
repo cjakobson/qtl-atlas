@@ -36,9 +36,9 @@ Then open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 ## Docker
 
 1. Place `science.adu3198_data_s4.csv` on the host (for example in `./data/`) and point compose at that folder:
-   - Create `./data` and copy the file as `data/science.adu3198_data_s4.csv`, or set `DATA_DIR` to a directory that contains the file.
+  - Create `./data` and copy the file as `data/science.adu3198_data_s4.csv`, or set `DATA_DIR` to a directory that contains the file.
 2. Build and run:
-   - `docker compose up --build`
+  - `docker compose up --build`
 3. Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 **Health check:** `GET /health` returns `{"status":"ok"}` (used by the compose `healthcheck`).
@@ -72,3 +72,4 @@ On first startup, the app will copy `DATA_CSV_SOURCE_PATH` to `DATA_CSV_PATH` if
 - `variant_type=missense_variant`
 - `pval_min=10&pval_max=20`
 - `sort_by=pVal&sort_order=desc&page=1&page_size=50`
+
