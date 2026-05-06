@@ -394,6 +394,12 @@
       width: 100%;
       height: 100%;
     }
+    #manhattan-plot {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
     .volcano-empty {
       margin: 0;
       padding: 16px;
@@ -587,6 +593,7 @@
     (function () {
       if (typeof Plotly === "undefined") return;
       var mode = "{{ query.search_mode }}";
+      var TOP_LABEL_COUNT = 25;
 
       function commonLayout(xTitle, yTitle) {
         return {
@@ -633,12 +640,12 @@
           return t || "row";
         });
 
-        // Label only top 10 points by pVal.
+        // Label only top N points by pVal.
         var pointLabels = new Array(pts.length).fill("");
         var ranked = y.map(function (v, i) { return { v: Number(v), i: i }; })
                       .filter(function (o) { return Number.isFinite(o.v); })
                       .sort(function (a, b) { return b.v - a.v; })
-                      .slice(0, 10);
+                      .slice(0, TOP_LABEL_COUNT);
         ranked.forEach(function (o) {
           var p = pts[o.i];
           pointLabels[o.i] = p.commonName ? String(p.commonName) : (p.protein ? String(p.protein) : "");
@@ -724,12 +731,20 @@
         if (!mpts || !mpts.length) return;
         var mx = mpts.map(function (p) { return p.plotIndex; });
         var my = mpts.map(function (p) { return p.pVal; });
+        var mlabels = new Array(mpts.length).fill("");
+        var mranked = my.map(function (v, i) { return { v: Number(v), i: i }; })
+                        .filter(function (o) { return Number.isFinite(o.v); })
+                        .sort(function (a, b) { return b.v - a.v; })
+                        .slice(0, TOP_LABEL_COUNT);
         var mcustom = mpts.map(function (p) {
           return p.gene1 || p.gene2 || p.common1 || p.common2 || "";
         });
         var mtext = mpts.map(function (p) {
           var reg = [p.gene1, p.gene2, p.common1, p.common2].filter(Boolean).join(" / ");
           return reg || "regulator";
+        });
+        mranked.forEach(function (o) {
+          mlabels[o.i] = mtext[o.i];
         });
 
         var mgd = document.getElementById("manhattan-plot");
@@ -738,10 +753,12 @@
           mgd,
           [{
             type: "scatter",
-            mode: "markers",
+            mode: "markers+text",
             x: mx,
             y: my,
-            text: mtext,
+            text: mlabels,
+            textposition: "top center",
+            textfont: { size: 9, color: "#d8e2f0" },
             customdata: mcustom,
             marker: { size: 6, color: "#6ea8ff", opacity: 0.75, line: { width: 0 } },
             hovertemplate: "%{text}<br>index = %{x:.0f}<br>pVal = %{y:.3f}<br><i>Click → regulators search</i><extra></extra>"
