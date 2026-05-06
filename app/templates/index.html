@@ -593,7 +593,8 @@
     (function () {
       if (typeof Plotly === "undefined") return;
       var mode = "{{ query.search_mode }}";
-      var TOP_LABEL_COUNT = 25;
+      var VOLCANO_TOP_LABEL_COUNT = 25;
+      var MANHATTAN_TOP_LABEL_COUNT = 5;
 
       function commonLayout(xTitle, yTitle) {
         return {
@@ -645,7 +646,7 @@
         var ranked = y.map(function (v, i) { return { v: Number(v), i: i }; })
                       .filter(function (o) { return Number.isFinite(o.v); })
                       .sort(function (a, b) { return b.v - a.v; })
-                      .slice(0, TOP_LABEL_COUNT);
+                      .slice(0, VOLCANO_TOP_LABEL_COUNT);
         ranked.forEach(function (o) {
           var p = pts[o.i];
           pointLabels[o.i] = p.commonName ? String(p.commonName) : (p.protein ? String(p.protein) : "");
@@ -735,7 +736,7 @@
         var mranked = my.map(function (v, i) { return { v: Number(v), i: i }; })
                         .filter(function (o) { return Number.isFinite(o.v); })
                         .sort(function (a, b) { return b.v - a.v; })
-                        .slice(0, TOP_LABEL_COUNT);
+                        .slice(0, MANHATTAN_TOP_LABEL_COUNT);
         var mcustom = mpts.map(function (p) {
           return p.gene1 || p.gene2 || p.common1 || p.common2 || "";
         });
