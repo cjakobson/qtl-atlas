@@ -84,6 +84,7 @@ def _target_href(term: str | int | float | None, query: SearchQuery) -> str:
 
 
 VOLCANO_MAX_POINTS = 12_000
+MANHATTAN_MAX_POINTS = 20_000
 
 
 def _build_volcano_points(df: pd.DataFrame) -> list[dict[str, Any]]:
@@ -105,6 +106,35 @@ def _build_volcano_points(df: pd.DataFrame) -> list[dict[str, Any]]:
 
     clean = plot_df.replace([np.inf, -np.inf], np.nan).dropna(subset=["beta", "pVal"])
     return to_records(clean)
+
+
+def _build_manhattan_points(df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Rows for targets-mode Manhattan: pVal (y) vs pQTL index (x)."""
+    if df.empty or "pVal" not in df.columns:
+        return []
+
+    cols = ["pVal"]
+    for optional in ("index", "protein", "commonName", "gene1", "gene2", "common1", "common2"):
+        if optional in df.columns:
+            cols.append(optional)
+
+    plot_df = df.loc[:, cols].replace([np.inf, -np.inf], np.nan).dropna(subset=["pVal"])
+    if plot_df.empty:
+        return []
+
+    if "index" in plot_df.columns:
+        plot_df["plotIndex"] = pd.to_numeric(plot_df["index"], errors="coerce")
+    else:
+        plot_df["plotIndex"] = np.arange(1, len(plot_df) + 1, dtype=float)
+
+    plot_df = plot_df.dropna(subset=["plotIndex"])
+    if plot_df.empty:
+        return []
+
+    if len(plot_df) > MANHATTAN_MAX_POINTS:
+        plot_df = plot_df.sample(n=MANHATTAN_MAX_POINTS, random_state=1)
+
+    return to_records(plot_df)
 
 
 DISPLAY_COLUMNS = [
@@ -211,8 +241,11 @@ def index(request: Request, query: SearchQuery = Depends(_search_query_from_requ
     available_columns = set(load_dataframe().columns.tolist())
     display_columns = [{"key": key, "label": label} for key, label in DISPLAY_COLUMNS if key in available_columns]
     volcano_points: list[dict[str, Any]] = []
+    manhattan_points: list[dict[str, Any]] = []
     if query.search_mode == SEARCH_MODE_REGULATORS:
         volcano_points = _build_volcano_points(result["all_rows"])
+    elif query.search_mode == SEARCH_MODE_TARGETS:
+        manhattan_points = _build_manhattan_points(result["all_rows"])
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -228,6 +261,7 @@ def index(request: Request, query: SearchQuery = Depends(_search_query_from_requ
             "target_href": lambda t: _target_href(t, query),
             "target_link_keys": TARGET_LINK_KEYS,
             "volcano_points": volcano_points,
+            "manhattan_points": manhattan_points,
         },
     )
 

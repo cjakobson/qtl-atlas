@@ -426,7 +426,7 @@
   </style>
 </head>
 <body>
-  <div class="container{% if query.search_mode == 'regulators' %} container--wide{% endif %}">
+  <div class="container{% if query.search_mode in ['regulators', 'targets'] %} container--wide{% endif %}">
     <header class="hero">
       <h1>pQTL mapping</h1>
       <p class="subtitle">Search, filter, sort, and export pQTLs.</p>
@@ -492,7 +492,7 @@
       </div>
 
       {% if rows %}
-      <div class="{% if query.search_mode == 'regulators' %}results-layout--split{% endif %}">
+      <div class="{% if query.search_mode in ['regulators', 'targets'] %}results-layout--split{% endif %}">
         <div class="results-table-panel">
           <div class="table-wrap">
             <table>
@@ -519,7 +519,7 @@
               </thead>
               <tbody>
                 {% for row in rows %}
-                <tr class="{% if row['beta'] is number and row['beta'] > 0 %}beta-positive{% elif row['beta'] is number and row['beta'] < 0 %}beta-negative{% endif %}">
+                <tr data-protein="{{ row['protein'] if row['protein'] is not none else '' }}" class="{% if row['beta'] is number and row['beta'] > 0 %}beta-positive{% elif row['beta'] is number and row['beta'] < 0 %}beta-negative{% endif %}">
                   {% for col in display_columns %}
                   <td class="{% if loop.index == 2 %}col-divider{% endif %}">
                     {% set val = row[col.key] %}
@@ -561,6 +561,18 @@
           <p class="volcano-empty">No points with both β and pVal in the current result set.</p>
           {% endif %}
         </aside>
+        {% elif query.search_mode == 'targets' %}
+        <aside class="volcano-panel" aria-label="Manhattan plot for regulators">
+          <h3>Manhattan</h3>
+          <p class="volcano-caption">All filtered rows: <strong>pVal</strong> (vertical) vs <strong>index</strong> (horizontal) for regulators of this target.</p>
+          {% if manhattan_points|length > 0 %}
+          <div class="volcano-plot-frame">
+            <div id="manhattan-plot"></div>
+          </div>
+          {% else %}
+          <p class="volcano-empty">No points with both index and pVal in the current result set.</p>
+          {% endif %}
+        </aside>
         {% endif %}
       </div>
       {% else %}
@@ -569,108 +581,203 @@
     </section>
   </div>
 
-  {% if query.search_mode == 'regulators' and rows and volcano_points|length > 0 %}
+  {% if (query.search_mode == 'regulators' and rows and volcano_points|length > 0) or (query.search_mode == 'targets' and rows and manhattan_points|length > 0) %}
   <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
   <script>
     (function () {
-      var pts = {{ volcano_points|tojson }};
-      if (!pts || !pts.length || typeof Plotly === "undefined") return;
+      if (typeof Plotly === "undefined") return;
+      var mode = "{{ query.search_mode }}";
 
-      var x = pts.map(function (p) { return p.beta; });
-      var y = pts.map(function (p) { return p.pVal; });
-      var text = pts.map(function (p) {
-        var parts = [];
-        if (p.protein) parts.push(String(p.protein));
-        if (p.commonName) parts.push(String(p.commonName));
-        var t = parts.join(" / ");
-        if (p.gene1 || p.gene2) {
-          var g = [p.gene1, p.gene2].filter(Boolean).join(", ");
-          if (g) t = (t ? t + " · " : "") + g;
-        }
-        return t || "row";
-      });
-      var pointLabels = pts.map(function (p) {
-        if (p.commonName) return String(p.commonName);
-        if (p.protein) return String(p.protein);
-        return "";
-      });
-      var markerColor = x.map(function (v) { return v >= 0 ? "#00a9e0" : "#f47c20"; });
-      var customdata = pts.map(function (p) {
-        return p.protein != null && p.protein !== "" ? String(p.protein) : "";
-      });
-
-      var gd = document.getElementById("volcano-plot");
-      var frame = gd && gd.parentElement;
-      function refitVolcano() {
-        if (!gd || typeof Plotly === "undefined") return;
-        try {
-          Plotly.Plots.resize(gd);
-        } catch (e) {}
-      }
-
-      Plotly.newPlot(
-        gd,
-        [{
-          type: "scatter",
-          mode: "markers+text",
-          x: x,
-          y: y,
-          text: pointLabels,
-          textposition: "top center",
-          textfont: { size: 9, color: "#d8e2f0" },
-          customdata: customdata,
-          marker: { size: 6, color: markerColor, opacity: 0.72, line: { width: 0 } },
-          hovertemplate: "%{text}<br>β = %{x:.4f}<br>pVal = %{y:.3f}<br><i>Click → target search</i><extra></extra>"
-        }],
-        {
+      function commonLayout(xTitle, yTitle) {
+        return {
           paper_bgcolor: "rgba(0,0,0,0)",
           plot_bgcolor: "#4a535d",
           font: { color: "#ecf2fa", size: 11 },
           margin: { t: 8, r: 10, b: 44, l: 52 },
           xaxis: {
-            title: { text: "beta" },
+            title: { text: xTitle },
             zeroline: true,
             zerolinewidth: 1,
             zerolinecolor: "#8ea1b8",
             gridcolor: "rgba(255,255,255,0.08)"
           },
           yaxis: {
-            title: { text: "pVal" },
+            title: { text: yTitle },
             zeroline: false,
             gridcolor: "rgba(255,255,255,0.08)"
           },
           showlegend: false
-        },
-        { responsive: true, displayModeBar: true, displaylogo: false }
-      ).then(function () {
-        refitVolcano();
-        window.addEventListener("resize", refitVolcano);
-        if (frame && typeof ResizeObserver !== "undefined") {
-          var ro = new ResizeObserver(refitVolcano);
-          ro.observe(frame);
+        };
+      }
+
+      function refitPlot(gd) {
+        if (!gd || typeof Plotly === "undefined") return;
+        try { Plotly.Plots.resize(gd); } catch (e) {}
+      }
+
+      if (mode === "regulators") {
+        var pts = {{ volcano_points|tojson }};
+        if (!pts || !pts.length) return;
+
+        var x = pts.map(function (p) { return p.beta; });
+        var y = pts.map(function (p) { return p.pVal; });
+        var text = pts.map(function (p) {
+          var parts = [];
+          if (p.protein) parts.push(String(p.protein));
+          if (p.commonName) parts.push(String(p.commonName));
+          var t = parts.join(" / ");
+          if (p.gene1 || p.gene2) {
+            var g = [p.gene1, p.gene2].filter(Boolean).join(", ");
+            if (g) t = (t ? t + " · " : "") + g;
+          }
+          return t || "row";
+        });
+
+        // Label only top 10 points by pVal.
+        var pointLabels = new Array(pts.length).fill("");
+        var ranked = y.map(function (v, i) { return { v: Number(v), i: i }; })
+                      .filter(function (o) { return Number.isFinite(o.v); })
+                      .sort(function (a, b) { return b.v - a.v; })
+                      .slice(0, 10);
+        ranked.forEach(function (o) {
+          var p = pts[o.i];
+          pointLabels[o.i] = p.commonName ? String(p.commonName) : (p.protein ? String(p.protein) : "");
+        });
+
+        var markerColor = x.map(function (v) { return v >= 0 ? "#00a9e0" : "#f47c20"; });
+        var customdata = pts.map(function (p) { return p.protein != null ? String(p.protein) : ""; });
+
+        var gd = document.getElementById("volcano-plot");
+        var frame = gd && gd.parentElement;
+
+        function highlightProtein(protein) {
+          var sizes = customdata.map(function (p) { return protein && p === protein ? 9 : 6; });
+          var opac = customdata.map(function (p) { return protein ? (p === protein ? 1 : 0.3) : 0.72; });
+          var lwidth = customdata.map(function (p) { return protein && p === protein ? 1.5 : 0; });
+          var lcolor = customdata.map(function () { return "#f5f8fc"; });
+          Plotly.restyle(gd, {
+            "marker.size": [sizes],
+            "marker.opacity": [opac],
+            "marker.line.width": [lwidth],
+            "marker.line.color": [lcolor]
+          }, [0]);
         }
 
-        gd.on("plotly_click", function (ev) {
-          var p0 = ev.points && ev.points[0];
-          if (!p0) return;
-          var protein = p0.customdata;
-          if (protein == null || protein === "") return;
-          var params = new URLSearchParams();
-          params.set("q", String(protein));
-          params.set("search_mode", "targets");
-          params.set("page", "1");
-          var form = document.getElementById("search-form");
-          if (form) {
-            var sortBy = form.querySelector('input[name="sort_by"]');
-            var sortOrder = form.querySelector('input[name="sort_order"]');
-            var pageSize = form.querySelector('select[name="page_size"]');
-            if (sortBy && sortBy.value) params.set("sort_by", sortBy.value);
-            if (sortOrder && sortOrder.value) params.set("sort_order", sortOrder.value);
-            if (pageSize && pageSize.value) params.set("page_size", pageSize.value);
+        Plotly.newPlot(
+          gd,
+          [{
+            type: "scatter",
+            mode: "markers+text",
+            x: x,
+            y: y,
+            text: pointLabels,
+            textposition: "top center",
+            textfont: { size: 9, color: "#d8e2f0" },
+            customdata: customdata,
+            marker: { size: 6, color: markerColor, opacity: 0.72, line: { width: 0 } },
+            hovertemplate: "%{customdata}<br>β = %{x:.4f}<br>pVal = %{y:.3f}<br><i>Click → target search</i><extra></extra>"
+          }],
+          commonLayout("beta", "pVal"),
+          { responsive: true, displayModeBar: true, displaylogo: false }
+        ).then(function () {
+          refitPlot(gd);
+          window.addEventListener("resize", function () { refitPlot(gd); });
+          if (frame && typeof ResizeObserver !== "undefined") {
+            var ro = new ResizeObserver(function () { refitPlot(gd); });
+            ro.observe(frame);
           }
-          window.location.href = window.location.pathname + "?" + params.toString();
+
+          gd.on("plotly_click", function (ev) {
+            var p0 = ev.points && ev.points[0];
+            if (!p0) return;
+            var protein = p0.customdata;
+            if (protein == null || protein === "") return;
+            var params = new URLSearchParams();
+            params.set("q", String(protein));
+            params.set("search_mode", "targets");
+            params.set("page", "1");
+            var form = document.getElementById("search-form");
+            if (form) {
+              var sortBy = form.querySelector('input[name="sort_by"]');
+              var sortOrder = form.querySelector('input[name="sort_order"]');
+              var pageSize = form.querySelector('select[name="page_size"]');
+              if (sortBy && sortBy.value) params.set("sort_by", sortBy.value);
+              if (sortOrder && sortOrder.value) params.set("sort_order", sortOrder.value);
+              if (pageSize && pageSize.value) params.set("page_size", pageSize.value);
+            }
+            window.location.href = window.location.pathname + "?" + params.toString();
+          });
+
+          var tableRows = document.querySelectorAll(".results-table-panel tbody tr[data-protein]");
+          tableRows.forEach(function (tr) {
+            tr.addEventListener("mouseenter", function () {
+              var protein = (tr.getAttribute("data-protein") || "").trim();
+              highlightProtein(protein || null);
+            });
+            tr.addEventListener("mouseleave", function () {
+              highlightProtein(null);
+            });
+          });
         });
-      });
+      } else if (mode === "targets") {
+        var mpts = {{ manhattan_points|tojson }};
+        if (!mpts || !mpts.length) return;
+        var mx = mpts.map(function (p) { return p.plotIndex; });
+        var my = mpts.map(function (p) { return p.pVal; });
+        var mcustom = mpts.map(function (p) {
+          return p.gene1 || p.gene2 || p.common1 || p.common2 || "";
+        });
+        var mtext = mpts.map(function (p) {
+          var reg = [p.gene1, p.gene2, p.common1, p.common2].filter(Boolean).join(" / ");
+          return reg || "regulator";
+        });
+
+        var mgd = document.getElementById("manhattan-plot");
+        var mframe = mgd && mgd.parentElement;
+        Plotly.newPlot(
+          mgd,
+          [{
+            type: "scatter",
+            mode: "markers",
+            x: mx,
+            y: my,
+            text: mtext,
+            customdata: mcustom,
+            marker: { size: 6, color: "#6ea8ff", opacity: 0.75, line: { width: 0 } },
+            hovertemplate: "%{text}<br>index = %{x:.0f}<br>pVal = %{y:.3f}<br><i>Click → regulators search</i><extra></extra>"
+          }],
+          commonLayout("index", "pVal"),
+          { responsive: true, displayModeBar: true, displaylogo: false }
+        ).then(function () {
+          refitPlot(mgd);
+          window.addEventListener("resize", function () { refitPlot(mgd); });
+          if (mframe && typeof ResizeObserver !== "undefined") {
+            var mro = new ResizeObserver(function () { refitPlot(mgd); });
+            mro.observe(mframe);
+          }
+
+          mgd.on("plotly_click", function (ev) {
+            var p0 = ev.points && ev.points[0];
+            if (!p0) return;
+            var regulator = p0.customdata;
+            if (regulator == null || regulator === "") return;
+            var params = new URLSearchParams();
+            params.set("q", String(regulator));
+            params.set("search_mode", "regulators");
+            params.set("page", "1");
+            var form = document.getElementById("search-form");
+            if (form) {
+              var sortBy = form.querySelector('input[name="sort_by"]');
+              var sortOrder = form.querySelector('input[name="sort_order"]');
+              var pageSize = form.querySelector('select[name="page_size"]');
+              if (sortBy && sortBy.value) params.set("sort_by", sortBy.value);
+              if (sortOrder && sortOrder.value) params.set("sort_order", sortOrder.value);
+              if (pageSize && pageSize.value) params.set("page_size", pageSize.value);
+            }
+            window.location.href = window.location.pathname + "?" + params.toString();
+          });
+        });
+      }
     })();
   </script>
   {% endif %}
