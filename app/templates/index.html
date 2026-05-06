@@ -735,17 +735,20 @@
         var mlabels = new Array(mpts.length).fill("");
         var mranked = my.map(function (v, i) { return { v: Number(v), i: i }; })
                         .filter(function (o) { return Number.isFinite(o.v); })
-                        .sort(function (a, b) { return b.v - a.v; })
-                        .slice(0, MANHATTAN_TOP_LABEL_COUNT);
+                        .sort(function (a, b) { return b.v - a.v; });
+        var mrankedCommon1 = mranked.filter(function (o) {
+          var c = mpts[o.i].common1;
+          return c != null && String(c).trim() !== "";
+        }).slice(0, MANHATTAN_TOP_LABEL_COUNT);
         var mcustom = mpts.map(function (p) {
           return p.gene1 || p.gene2 || p.common1 || p.common2 || "";
         });
-        var mtext = mpts.map(function (p) {
+        var mhover = mpts.map(function (p) {
           var reg = [p.gene1, p.gene2, p.common1, p.common2].filter(Boolean).join(" / ");
           return reg || "regulator";
         });
-        mranked.forEach(function (o) {
-          mlabels[o.i] = mtext[o.i];
+        mrankedCommon1.forEach(function (o) {
+          mlabels[o.i] = String(mpts[o.i].common1).trim();
         });
 
         var mgd = document.getElementById("manhattan-plot");
@@ -760,9 +763,10 @@
             text: mlabels,
             textposition: "top center",
             textfont: { size: 9, color: "#d8e2f0" },
+            hovertext: mhover,
             customdata: mcustom,
             marker: { size: 6, color: "#6ea8ff", opacity: 0.75, line: { width: 0 } },
-            hovertemplate: "%{text}<br>index = %{x:.0f}<br>pVal = %{y:.3f}<br><i>Click → regulators search</i><extra></extra>"
+            hovertemplate: "%{hovertext}<br>index = %{x:.0f}<br>pVal = %{y:.3f}<br><i>Click → regulators search</i><extra></extra>"
           }],
           commonLayout("index", "pVal"),
           { responsive: true, displayModeBar: true, displaylogo: false }
